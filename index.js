@@ -17,7 +17,7 @@ const db = new pg.Client({
   host: process.env.DB_HOST,
   database: process.env.DB_NAME,
   password: process.env.DB_PASSWORD,
-  port: DB_PORT,
+  port: process.env.DB_PORT,
 });
 
 db.connect()
@@ -25,28 +25,28 @@ db.connect()
   .catch((err) => console.log("error: ", err.stack));
 
 let visited_countries = [];
-let all_countries = [];
-async function getAllCountries() {
+
+async function getCountry(input) {
+  if (input === "") return undefined;
   try {
     const result = await db.query(
-      "SELECT country_code, country_name FROM countries"
+      "SELECT country_code FROM countries WHERE LOWER(country_name) LIKE '%' || $1 || '%'",
+      [input.toLowerCase()]
     );
-    all_countries = result.rows;
-    // console.log(all_countries);
+    return result.rows[0];
   } catch (err) {
     console.log(err);
+    return undefined;
   }
 }
-await getAllCountries();
 
-let count;
 async function getVisitedCountries() {
   try {
+    visited_countries = [];
     const result = await db.query("SELECT country_code FROM visited_countries");
     result.rows.forEach((row) => {
       visited_countries.push(row.country_code);
     });
-    count = result.rowCount;
   } catch (err) {
     console.log(err);
   }
@@ -67,33 +67,34 @@ app.get("/", async (req, res) => {
   await getVisitedCountries();
   res.render("index.ejs", {
     countries: visited_countries,
-    total: count,
+    total: visited_countries.length,
   });
 });
 
 app.post("/add", async (req, res) => {
-  const country = all_countries.find(
-    (code) => code.country_name.toLowerCase() === req.body.country.toLowerCase()
-  );
+  const country = await getCountry(req.body.country);
   console.log(country);
   if (!country) {
-    console.log("country does not exist!");
-    res.redirect("/");
-    return;
-  }
-  console.log(visited_countries);
-  const found = visited_countries.find((code) => {
-    console.log(code);
-    return code === country.country_code;
-  });
-  if (!found) {
-    await insertIntoCountry(country.country_code);
-    await getVisitedCountries();
     res.render("index.ejs", {
       countries: visited_countries,
-      total: count,
+      total: visited_countries.length,
+      error: "Country does not exist, try again!",
     });
+    return;
   }
+
+  const found = visited_countries.find((code) => code === country.country_code);
+
+  if (found) {
+    res.render("index.ejs", {
+      countries: visited_countries,
+      total: visited_countries.length,
+      error: "Country has already been added, try again!",
+    });
+    return;
+  }
+
+  await insertIntoCountry(country.country_code);
   res.redirect("/");
 });
 

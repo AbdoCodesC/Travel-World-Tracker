@@ -911,10 +911,9 @@
     <h2 class="total-count">Total Countries: <%=total%></h2>
     <script>
       const country_codes = "<%= countries %>".split(",");
-      console.log("indexejs, ", country_codes);
+      console.log(country_codes);
       console.log(typeof "<%= countries %>");
       country_codes.forEach((code) => {
-        console.log("IN HERE");
         document.getElementById(code).style.fill = "teal";
       });
     </script>
